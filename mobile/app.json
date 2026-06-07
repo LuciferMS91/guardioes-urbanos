@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Guardiões Urbanos",
+    "slug": "guardioes-urbanos",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "guardioesurbanos",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.miguelbrito.guardioesurbanos",
+      "permissions": [
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-location",
+      "expo-image-picker"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "396d39b5-e941-48cf-b143-d83a16ecdd44"
+      }
+    }
+  }
+}

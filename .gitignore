@@ -1,0 +1,8 @@
+backend/node_modules
+mobile/node_modules
+mobile/.expo
+mobile/android
+mobile/ios
+backend/.env
+mobile/.env
+*.log

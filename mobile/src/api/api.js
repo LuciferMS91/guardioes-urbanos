@@ -1,6 +1,7 @@
 import axios from "axios";
 
 export const API_ORIGIN =
+    process.env.EXPO_PUBLIC_API_ORIGIN ||
     "https://guardioes-urbanos-production.up.railway.app";
 
 const api = axios.create({

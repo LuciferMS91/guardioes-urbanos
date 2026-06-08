@@ -3,6 +3,7 @@ mobile/node_modules
 mobile/.expo
 mobile/android
 mobile/ios
+backend/uploads
 backend/.env
 mobile/.env
 *.log

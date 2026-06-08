@@ -13,11 +13,12 @@ router.get("/teste-db", async (req, res) => {
         });
 
     } catch (erro) {
+        console.error("ERRO NO TESTE DO BANCO:");
         console.error(erro);
 
         res.status(500).json({
             sucesso: false,
-            erro: erro.message
+            erro: "Erro ao conectar ao banco de dados"
         });
     }
 });

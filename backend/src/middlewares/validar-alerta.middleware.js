@@ -7,22 +7,42 @@ module.exports = (req, res, next) => {
         longitude
     } = req.body;
 
+    const tiposPermitidos = [
+        "ASSALTO_ROUBO",
+        "ATIVIDADE_SUSPEITA",
+        "FALTA_ILUMINACAO",
+        "ALAGAMENTO",
+        "VIA_INTRANSITAVEL",
+        "QUEDA_ENERGIA",
+        "FALTA_AGUA",
+        "OUTROS"
+    ];
+
     if (!tipo) {
         return res.status(400).json({
             erro: "Tipo do alerta é obrigatório"
         });
     }
 
-    if (!descricao || descricao.length < 5) {
+    if (!tiposPermitidos.includes(tipo)) {
+        return res.status(400).json({
+            erro: "Tipo do alerta inválido"
+        });
+    }
+
+    if (!descricao || descricao.trim().length < 5) {
         return res.status(400).json({
             erro: "Descrição deve possuir pelo menos 5 caracteres"
         });
     }
 
+    const latitudeNumero = Number(latitude);
+    const longitudeNumero = Number(longitude);
+
     if (
-        latitude === undefined ||
-        latitude < -90 ||
-        latitude > 90
+        !Number.isFinite(latitudeNumero) ||
+        latitudeNumero < -90 ||
+        latitudeNumero > 90
     ) {
         return res.status(400).json({
             erro: "Latitude inválida"
@@ -30,9 +50,9 @@ module.exports = (req, res, next) => {
     }
 
     if (
-        longitude === undefined ||
-        longitude < -180 ||
-        longitude > 180
+        !Number.isFinite(longitudeNumero) ||
+        longitudeNumero < -180 ||
+        longitudeNumero > 180
     ) {
         return res.status(400).json({
             erro: "Longitude inválida"

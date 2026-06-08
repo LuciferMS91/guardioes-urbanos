@@ -8,9 +8,6 @@ class AuthController {
 
         try {
 
-            console.log("CADASTRO RECEBIDO:");
-            console.log(req.body);
-
             const {
                 nome,
                 email,
@@ -18,9 +15,23 @@ class AuthController {
                 senha
             } = req.body;
 
+            if (!nome || !email || !senha) {
+                return res.status(400).json({
+                    erro: "Nome, e-mail e senha são obrigatórios"
+                });
+            }
+
+            if (String(senha).length < 6) {
+                return res.status(400).json({
+                    erro: "Senha deve possuir pelo menos 6 caracteres"
+                });
+            }
+
+            const emailNormalizado = String(email).trim().toLowerCase();
+
             const usuarioExiste = await db.query(
-                "SELECT * FROM usuarios WHERE email = $1",
-                [email]
+                "SELECT id FROM usuarios WHERE email = $1",
+                [emailNormalizado]
             );
 
             if (usuarioExiste.rows.length > 0) {
@@ -40,7 +51,7 @@ class AuthController {
                 `,
                 [
                     nome,
-                    email,
+                    emailNormalizado,
                     telefone,
                     senhaHash
                 ]
@@ -64,49 +75,43 @@ class AuthController {
 
     async login(req, res) {
 
-        console.log("LOGIN RECEBIDO:");
-        console.log(req.body);
-
         try {
 
             const { email, senha } = req.body;
 
-            console.log("ETAPA 1");
-
-            const usuario = await db.query(
-                "SELECT * FROM usuarios WHERE email = $1",
-                [email]
-            );
-
-            console.log("ETAPA 2");
-
-            if (usuario.rows.length === 0) {
-                return res.status(401).json({
-                    erro: "Usuário não encontrado"
+            if (!email || !senha) {
+                return res.status(400).json({
+                    erro: "E-mail e senha são obrigatórios"
                 });
             }
 
-            console.log("ETAPA 3");
+            const emailNormalizado = String(email).trim().toLowerCase();
 
-            console.log("Senha enviada:", senha);
-            console.log("Hash armazenado:", usuario.rows[0].senha);
+            const usuario = await db.query(
+                `
+                SELECT id, senha
+                FROM usuarios
+                WHERE email = $1 AND ativo = TRUE
+                `,
+                [emailNormalizado]
+            );
+
+            if (usuario.rows.length === 0) {
+                return res.status(401).json({
+                    erro: "Credenciais inválidas"
+                });
+            }
 
             const senhaValida = await bcrypt.compare(
                 senha,
                 usuario.rows[0].senha
             );
 
-            console.log("ETAPA 4");
-            console.log("SENHA VÁLIDA:", senhaValida);
-
             if (!senhaValida) {
                 return res.status(401).json({
-                    erro: "Senha inválida"
+                    erro: "Credenciais inválidas"
                 });
             }
-
-            console.log("ETAPA 5");
-            console.log("CRIANDO TOKEN...");
 
             const token = jwt.sign(
                 {
@@ -117,9 +122,6 @@ class AuthController {
                     expiresIn: "7d"
                 }
             );
-
-            console.log("TOKEN CRIADO COM SUCESSO");
-            console.log("ETAPA 6");
 
             return res.status(200).json({
                 sucesso: true,
@@ -132,7 +134,7 @@ class AuthController {
             console.error(erro);
 
             return res.status(500).json({
-                erro: erro.message
+                erro: "Erro ao fazer login"
             });
         }
     }

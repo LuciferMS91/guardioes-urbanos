@@ -10,9 +10,7 @@ import {
     Image
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
-import api from "../api/api";
-
-const API_URL = "http://192.168.1.121:3000";
+import api, { buildAssetUrl } from "../api/api";
 
 function iconeTipo(tipo: string) {
     const mapa: any = {
@@ -70,7 +68,7 @@ export default function HistoricoScreen() {
                     <Text style={styles.vazio}>Nenhum alerta encontrado.</Text>
                 }
                 renderItem={({ item }) => {
-                    const foto = item.foto_url ? `${API_URL}${item.foto_url}` : null;
+                    const foto = buildAssetUrl(item.foto_url);
 
                     return (
                         <TouchableOpacity

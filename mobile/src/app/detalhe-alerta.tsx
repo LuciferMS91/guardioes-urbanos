@@ -9,16 +9,12 @@ import {
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import api from "../api/api";
-
-const API_URL = "http://192.168.1.121:3000";
+import api, { buildAssetUrl } from "../api/api";
 
 export default function DetalheAlertaScreen() {
     const params = useLocalSearchParams();
 
-    const fotoUrl = params.foto_url
-        ? `${API_URL}${params.foto_url}`
-        : null;
+    const fotoUrl = buildAssetUrl(String(params.foto_url || ""));
 
     async function confirmar() {
         try {

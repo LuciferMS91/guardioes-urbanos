@@ -41,9 +41,33 @@ app.get("/", (req, res) => {
     });
 });
 
+app.use((erro, req, res, next) => {
+    if (erro?.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({
+            erro: "Imagem deve possuir no máximo 5MB"
+        });
+    }
+
+    if (erro?.message === "Apenas imagens são permitidas") {
+        return res.status(400).json({
+            erro: erro.message
+        });
+    }
+
+    return next(erro);
+});
+
 app.use((req, res) => {
     return res.status(404).json({
         erro: "Rota não encontrada"
+    });
+});
+
+app.use((erro, req, res, next) => {
+    console.error(erro);
+
+    return res.status(500).json({
+        erro: "Erro interno do servidor"
     });
 });
 

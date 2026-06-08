@@ -4,6 +4,7 @@ const router = express.Router();
 const alertaController = require("../controllers/alerta.controller");
 const authMiddleware = require("../middlewares/auth.middleware");
 const upload = require("../middlewares/upload.middleware");
+const validarAlerta = require("../middlewares/validar-alerta.middleware");
 const { limiteAlertas } = require("../middlewares/rate-limit.middleware");
 
 router.post(
@@ -11,6 +12,7 @@ router.post(
     authMiddleware,
     limiteAlertas,
     upload.single("foto"),
+    validarAlerta,
     alertaController.criar
 );
 

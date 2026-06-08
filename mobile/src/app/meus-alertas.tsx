@@ -11,9 +11,7 @@ import {
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import api from "../api/api";
-
-const API_URL = "http://192.168.1.121:3000";
+import api, { buildAssetUrl } from "../api/api";
 
 function iconeTipo(tipo: string) {
     const mapa: any = {
@@ -125,7 +123,7 @@ export default function MeusAlertasScreen() {
                     <Text style={styles.vazio}>Você ainda não criou alertas.</Text>
                 }
                 renderItem={({ item }) => {
-                    const foto = item.foto_url ? `${API_URL}${item.foto_url}` : null;
+                    const foto = buildAssetUrl(item.foto_url);
 
                     return (
                         <View style={styles.card}>

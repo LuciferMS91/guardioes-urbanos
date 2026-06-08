@@ -1,11 +1,9 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
-    "builder": "RAILPACK",
-    "buildCommand": "sh -c 'if [ -d backend ]; then cd backend; fi; npm ci'"
+    "builder": "DOCKERFILE"
   },
   "deploy": {
-    "startCommand": "sh -c 'if [ -d backend ]; then cd backend; fi; npm start'",
     "healthcheckPath": "/",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",

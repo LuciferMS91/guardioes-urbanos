@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -16,9 +16,49 @@ function formatarTipo(tipo: string) {
     return tipo?.replaceAll("_", " ") || "ALERTA";
 }
 
+function coordenadaValida(alerta: any) {
+    const latitude = Number(alerta?.latitude);
+    const longitude = Number(alerta?.longitude);
+
+    return (
+        Number.isFinite(latitude) &&
+        Number.isFinite(longitude) &&
+        latitude >= -90 &&
+        latitude <= 90 &&
+        longitude >= -180 &&
+        longitude <= 180
+    );
+}
+
+function montarUrlMapa(alertas: any[]) {
+    const alertaComLocalizacao = alertas.find(coordenadaValida);
+    const latitude = alertaComLocalizacao
+        ? Number(alertaComLocalizacao.latitude)
+        : -23.55052;
+    const longitude = alertaComLocalizacao
+        ? Number(alertaComLocalizacao.longitude)
+        : -46.633308;
+    const margem = alertaComLocalizacao ? 0.025 : 0.06;
+
+    const bbox = [
+        longitude - margem,
+        latitude - margem,
+        longitude + margem,
+        latitude + margem
+    ].join(",");
+
+    return (
+        "https://www.openstreetmap.org/export/embed.html" +
+        `?bbox=${encodeURIComponent(bbox)}` +
+        "&layer=mapnik" +
+        `&marker=${encodeURIComponent(`${latitude},${longitude}`)}`
+    );
+}
+
 export default function MapaRoute() {
     const [alertas, setAlertas] = useState<any[]>([]);
     const [carregando, setCarregando] = useState(true);
+    const mapaUrl = useMemo(() => montarUrlMapa(alertas), [alertas]);
 
     useEffect(() => {
         carregarAlertas();
@@ -89,45 +129,65 @@ export default function MapaRoute() {
                 </TouchableOpacity>
             </View>
 
-            {carregando ? (
-                <View style={styles.centralizado}>
-                    <ActivityIndicator size="large" color="#2563eb" />
-                </View>
-            ) : (
-                <FlatList
-                    data={alertas}
-                    keyExtractor={(item) => String(item.id)}
-                    contentContainerStyle={styles.lista}
-                    ListEmptyComponent={
-                        <Text style={styles.vazio}>
-                            Nenhum alerta ativo encontrado.
+            <View style={styles.conteudo}>
+                <View style={styles.mapaContainer}>
+                    {React.createElement("iframe", {
+                        title: "Mapa Guardiões Urbanos",
+                        src: mapaUrl,
+                        style: {
+                            border: 0,
+                            width: "100%",
+                            height: "100%"
+                        }
+                    })}
+
+                    <View style={styles.resumoMapa}>
+                        <Text style={styles.resumoTitulo}>
+                            {alertas.length} alertas ativos
                         </Text>
-                    }
-                    renderItem={({ item }) => (
-                        <TouchableOpacity
-                            style={styles.card}
-                            onPress={() =>
-                                router.push({
-                                    pathname: "/detalhe-alerta",
-                                    params: item
-                                } as any)
-                            }
-                        >
-                            <Text style={styles.tipo}>
-                                {formatarTipo(item.tipo)}
-                            </Text>
+                    </View>
+                </View>
 
-                            <Text style={styles.descricao}>
-                                {item.descricao}
+                {carregando ? (
+                    <View style={styles.centralizado}>
+                        <ActivityIndicator size="large" color="#2563eb" />
+                    </View>
+                ) : (
+                    <FlatList
+                        data={alertas}
+                        keyExtractor={(item) => String(item.id)}
+                        contentContainerStyle={styles.lista}
+                        ListEmptyComponent={
+                            <Text style={styles.vazio}>
+                                Nenhum alerta ativo encontrado.
                             </Text>
+                        }
+                        renderItem={({ item }) => (
+                            <TouchableOpacity
+                                style={styles.card}
+                                onPress={() =>
+                                    router.push({
+                                        pathname: "/detalhe-alerta",
+                                        params: item
+                                    } as any)
+                                }
+                            >
+                                <Text style={styles.tipo}>
+                                    {formatarTipo(item.tipo)}
+                                </Text>
 
-                            <Text style={styles.localizacao}>
-                                Lat: {item.latitude} | Long: {item.longitude}
-                            </Text>
-                        </TouchableOpacity>
-                    )}
-                />
-            )}
+                                <Text style={styles.descricao}>
+                                    {item.descricao}
+                                </Text>
+
+                                <Text style={styles.localizacao}>
+                                    Lat: {item.latitude} | Long: {item.longitude}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                    />
+                )}
+            </View>
 
             <TouchableOpacity
                 style={styles.botaoAlerta}
@@ -187,8 +247,36 @@ const styles = StyleSheet.create({
         color: "#2563eb",
         fontWeight: "bold"
     },
-    centralizado: {
+    conteudo: {
         flex: 1,
+        marginTop: 16,
+        marginBottom: 84
+    },
+    mapaContainer: {
+        height: 320,
+        borderRadius: 8,
+        overflow: "hidden",
+        backgroundColor: "#dbeafe",
+        borderWidth: 1,
+        borderColor: "#cbd5e1"
+    },
+    resumoMapa: {
+        position: "absolute",
+        top: 12,
+        left: 12,
+        backgroundColor: "#ffffff",
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: "#e2e8f0"
+    },
+    resumoTitulo: {
+        color: "#0f172a",
+        fontWeight: "bold"
+    },
+    centralizado: {
+        paddingVertical: 24,
         justifyContent: "center",
         alignItems: "center"
     },

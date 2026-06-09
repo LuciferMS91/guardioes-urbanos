@@ -16,6 +16,14 @@ function formatarTipo(tipo: string) {
     return tipo?.replaceAll("_", " ") || "ALERTA";
 }
 
+type CentroMapa = {
+    latitude: number;
+    longitude: number;
+    margem: number;
+    origem: string;
+    precisao?: number;
+};
+
 function coordenadaValida(alerta: any) {
     const latitude = Number(alerta?.latitude);
     const longitude = Number(alerta?.longitude);
@@ -30,8 +38,13 @@ function coordenadaValida(alerta: any) {
     );
 }
 
-function montarUrlMapa(alertas: any[]) {
+function obterCentroMapa(alertas: any[], localizacao: CentroMapa | null) {
+    if (localizacao) {
+        return localizacao;
+    }
+
     const alertaComLocalizacao = alertas.find(coordenadaValida);
+
     const latitude = alertaComLocalizacao
         ? Number(alertaComLocalizacao.latitude)
         : -23.55052;
@@ -39,6 +52,20 @@ function montarUrlMapa(alertas: any[]) {
         ? Number(alertaComLocalizacao.longitude)
         : -46.633308;
     const margem = alertaComLocalizacao ? 0.025 : 0.06;
+
+    return {
+        latitude,
+        longitude,
+        margem,
+        origem: alertaComLocalizacao ? "Alerta ativo" : "Centro padrão"
+    };
+}
+
+function montarUrlMapa(alertas: any[], localizacao: CentroMapa | null) {
+    const { latitude, longitude, margem } = obterCentroMapa(
+        alertas,
+        localizacao
+    );
 
     const bbox = [
         longitude - margem,
@@ -58,11 +85,50 @@ function montarUrlMapa(alertas: any[]) {
 export default function MapaRoute() {
     const [alertas, setAlertas] = useState<any[]>([]);
     const [carregando, setCarregando] = useState(true);
-    const mapaUrl = useMemo(() => montarUrlMapa(alertas), [alertas]);
+    const [localizacaoRede, setLocalizacaoRede] =
+        useState<CentroMapa | null>(null);
+    const centroMapa = useMemo(
+        () => obterCentroMapa(alertas, localizacaoRede),
+        [alertas, localizacaoRede]
+    );
+    const mapaUrl = useMemo(
+        () => montarUrlMapa(alertas, localizacaoRede),
+        [alertas, localizacaoRede]
+    );
 
     useEffect(() => {
         carregarAlertas();
+        carregarLocalizacaoRede();
     }, []);
+
+    function carregarLocalizacaoRede() {
+        if (
+            typeof navigator === "undefined" ||
+            !("geolocation" in navigator)
+        ) {
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (posicao) => {
+                setLocalizacaoRede({
+                    latitude: posicao.coords.latitude,
+                    longitude: posicao.coords.longitude,
+                    margem: 0.012,
+                    origem: "Localização atual",
+                    precisao: posicao.coords.accuracy
+                });
+            },
+            () => {
+                setLocalizacaoRede(null);
+            },
+            {
+                enableHighAccuracy: true,
+                maximumAge: 60000,
+                timeout: 12000
+            }
+        );
+    }
 
     async function carregarAlertas() {
         try {
@@ -143,8 +209,32 @@ export default function MapaRoute() {
 
                     <View style={styles.resumoMapa}>
                         <Text style={styles.resumoTitulo}>
+                            {centroMapa.origem}
+                        </Text>
+
+                        <Text style={styles.resumoTexto}>
+                            {centroMapa.latitude.toFixed(5)},{" "}
+                            {centroMapa.longitude.toFixed(5)}
+                        </Text>
+
+                        {centroMapa.precisao ? (
+                            <Text style={styles.resumoTexto}>
+                                Precisão aprox. {Math.round(centroMapa.precisao)}m
+                            </Text>
+                        ) : null}
+
+                        <Text style={styles.resumoTexto}>
                             {alertas.length} alertas ativos
                         </Text>
+
+                        <TouchableOpacity
+                            style={styles.botaoLocalizacao}
+                            onPress={carregarLocalizacaoRede}
+                        >
+                            <Text style={styles.textoLocalizacao}>
+                                Atualizar localização
+                            </Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
 
@@ -273,6 +363,24 @@ const styles = StyleSheet.create({
     },
     resumoTitulo: {
         color: "#0f172a",
+        fontWeight: "bold"
+    },
+    resumoTexto: {
+        color: "#475569",
+        fontSize: 12,
+        marginTop: 2
+    },
+    botaoLocalizacao: {
+        marginTop: 8,
+        backgroundColor: "#2563eb",
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 7,
+        alignItems: "center"
+    },
+    textoLocalizacao: {
+        color: "#ffffff",
+        fontSize: 12,
         fontWeight: "bold"
     },
     centralizado: {

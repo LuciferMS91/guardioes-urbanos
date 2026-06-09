@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -61,27 +61,6 @@ function obterCentroMapa(alertas: any[], localizacao: CentroMapa | null) {
     };
 }
 
-function montarUrlMapa(alertas: any[], localizacao: CentroMapa | null) {
-    const { latitude, longitude, margem } = obterCentroMapa(
-        alertas,
-        localizacao
-    );
-
-    const bbox = [
-        longitude - margem,
-        latitude - margem,
-        longitude + margem,
-        latitude + margem
-    ].join(",");
-
-    return (
-        "https://www.openstreetmap.org/export/embed.html" +
-        `?bbox=${encodeURIComponent(bbox)}` +
-        "&layer=mapnik" +
-        `&marker=${encodeURIComponent(`${latitude},${longitude}`)}`
-    );
-}
-
 export default function MapaRoute() {
     const [alertas, setAlertas] = useState<any[]>([]);
     const [carregando, setCarregando] = useState(true);
@@ -91,9 +70,9 @@ export default function MapaRoute() {
         () => obterCentroMapa(alertas, localizacaoRede),
         [alertas, localizacaoRede]
     );
-    const mapaUrl = useMemo(
-        () => montarUrlMapa(alertas, localizacaoRede),
-        [alertas, localizacaoRede]
+    const alertasVisiveis = useMemo(
+        () => alertas.filter(coordenadaValida),
+        [alertas]
     );
 
     useEffect(() => {
@@ -197,15 +176,47 @@ export default function MapaRoute() {
 
             <View style={styles.conteudo}>
                 <View style={styles.mapaContainer}>
-                    {React.createElement("iframe", {
-                        title: "Mapa Guardiões Urbanos",
-                        src: mapaUrl,
-                        style: {
-                            border: 0,
-                            width: "100%",
-                            height: "100%"
-                        }
-                    })}
+                    <View style={styles.mapaBase}>
+                        <View style={[styles.linhaMapa, styles.linhaHorizontalUm]} />
+                        <View style={[styles.linhaMapa, styles.linhaHorizontalDois]} />
+                        <View style={[styles.linhaMapa, styles.linhaVerticalUm]} />
+                        <View style={[styles.linhaMapa, styles.linhaVerticalDois]} />
+                        <View style={styles.anelMapaGrande} />
+                        <View style={styles.anelMapaPequeno} />
+
+                        {alertasVisiveis.map((alerta) => {
+                            const posicao = calcularPosicaoMarcador(
+                                alerta,
+                                centroMapa
+                            );
+
+                            return (
+                                <TouchableOpacity
+                                    key={String(alerta.id)}
+                                    style={[
+                                        styles.marcadorAlerta,
+                                        {
+                                            left: `${posicao.left}%`,
+                                            top: `${posicao.top}%`,
+                                            backgroundColor: corDoAlerta(alerta.tipo)
+                                        }
+                                    ]}
+                                    onPress={() =>
+                                        router.push({
+                                            pathname: "/detalhe-alerta",
+                                            params: alerta
+                                        } as any)
+                                    }
+                                >
+                                    <Text style={styles.textoMarcador}>!</Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+
+                        <View style={styles.marcadorCentro}>
+                            <View style={styles.pontoCentro} />
+                        </View>
+                    </View>
 
                     <View style={styles.resumoMapa}>
                         <Text style={styles.resumoTitulo}>
@@ -289,6 +300,40 @@ export default function MapaRoute() {
     );
 }
 
+function limitar(valor: number, minimo: number, maximo: number) {
+    return Math.min(Math.max(valor, minimo), maximo);
+}
+
+function calcularPosicaoMarcador(alerta: any, centroMapa: CentroMapa) {
+    const latitude = Number(alerta.latitude);
+    const longitude = Number(alerta.longitude);
+    const escala = centroMapa.margem * 2;
+
+    return {
+        left: limitar(
+            50 + ((longitude - centroMapa.longitude) / escala) * 100,
+            6,
+            94
+        ),
+        top: limitar(
+            50 - ((latitude - centroMapa.latitude) / escala) * 100,
+            6,
+            94
+        )
+    };
+}
+
+function corDoAlerta(tipo: string) {
+    if (tipo === "ASSALTO_ROUBO") return "#dc2626";
+    if (tipo === "ATIVIDADE_SUSPEITA") return "#f97316";
+    if (tipo === "FALTA_ILUMINACAO") return "#eab308";
+    if (tipo === "ALAGAMENTO") return "#2563eb";
+    if (tipo === "VIA_INTRANSITAVEL") return "#7c3aed";
+    if (tipo === "QUEDA_ENERGIA") return "#9333ea";
+    if (tipo === "FALTA_AGUA") return "#16a34a";
+    return "#64748b";
+}
+
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -349,6 +394,105 @@ const styles = StyleSheet.create({
         backgroundColor: "#dbeafe",
         borderWidth: 1,
         borderColor: "#cbd5e1"
+    },
+    mapaBase: {
+        flex: 1,
+        backgroundColor: "#dbeafe",
+        position: "relative"
+    },
+    linhaMapa: {
+        position: "absolute",
+        backgroundColor: "rgba(37, 99, 235, 0.16)"
+    },
+    linhaHorizontalUm: {
+        left: 0,
+        right: 0,
+        top: "34%",
+        height: 5,
+        transform: [{ rotate: "-8deg" }]
+    },
+    linhaHorizontalDois: {
+        left: 0,
+        right: 0,
+        top: "64%",
+        height: 7,
+        transform: [{ rotate: "6deg" }]
+    },
+    linhaVerticalUm: {
+        top: 0,
+        bottom: 0,
+        left: "34%",
+        width: 6,
+        transform: [{ rotate: "10deg" }]
+    },
+    linhaVerticalDois: {
+        top: 0,
+        bottom: 0,
+        left: "68%",
+        width: 5,
+        transform: [{ rotate: "-12deg" }]
+    },
+    anelMapaGrande: {
+        position: "absolute",
+        width: 210,
+        height: 210,
+        borderRadius: 105,
+        borderWidth: 2,
+        borderColor: "rgba(15, 23, 42, 0.10)",
+        left: "50%",
+        top: "50%",
+        marginLeft: -105,
+        marginTop: -105
+    },
+    anelMapaPequeno: {
+        position: "absolute",
+        width: 96,
+        height: 96,
+        borderRadius: 48,
+        borderWidth: 2,
+        borderColor: "rgba(15, 23, 42, 0.14)",
+        left: "50%",
+        top: "50%",
+        marginLeft: -48,
+        marginTop: -48
+    },
+    marcadorCentro: {
+        position: "absolute",
+        left: "50%",
+        top: "50%",
+        width: 34,
+        height: 34,
+        marginLeft: -17,
+        marginTop: -17,
+        borderRadius: 17,
+        backgroundColor: "rgba(37, 99, 235, 0.18)",
+        alignItems: "center",
+        justifyContent: "center"
+    },
+    pontoCentro: {
+        width: 14,
+        height: 14,
+        borderRadius: 7,
+        backgroundColor: "#2563eb",
+        borderWidth: 3,
+        borderColor: "#ffffff"
+    },
+    marcadorAlerta: {
+        position: "absolute",
+        width: 28,
+        height: 28,
+        marginLeft: -14,
+        marginTop: -14,
+        borderRadius: 14,
+        alignItems: "center",
+        justifyContent: "center",
+        borderWidth: 2,
+        borderColor: "#ffffff"
+    },
+    textoMarcador: {
+        color: "#ffffff",
+        fontSize: 14,
+        fontWeight: "bold"
     },
     resumoMapa: {
         position: "absolute",

@@ -471,9 +471,6 @@ export default function MapaRoute() {
             <View style={styles.topo}>
                 <View>
                     <Text style={styles.titulo}>Guardiões Urbanos</Text>
-                    <Text style={styles.subtitulo}>
-                        Alertas ativos na versão web
-                    </Text>
                 </View>
 
                 <TouchableOpacity onPress={sair}>
@@ -660,10 +657,6 @@ const styles = StyleSheet.create({
         fontSize: 22,
         fontWeight: "bold",
         color: "#0f172a"
-    },
-    subtitulo: {
-        color: "#64748b",
-        marginTop: 4
     },
     sair: {
         color: "#dc2626",

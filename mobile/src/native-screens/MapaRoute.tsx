@@ -171,6 +171,8 @@ html, body, #mapa {
     top: 12px;
     display: grid;
     gap: 8px;
+    z-index: 20;
+    pointer-events: auto;
 }
 .controle {
     width: 36px;
@@ -181,8 +183,10 @@ html, body, #mapa {
     color: #0f172a;
     font-size: 24px;
     font-weight: 800;
+    line-height: 1;
     box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
     cursor: pointer;
+    touch-action: manipulation;
 }
 .osm {
     position: absolute;
@@ -202,8 +206,8 @@ html, body, #mapa {
     <div id="marcadores"></div>
     <div class="centro" title="Centro do mapa"></div>
     <div class="controles">
-        <button class="controle" id="mais" aria-label="Aproximar">+</button>
-        <button class="controle" id="menos" aria-label="Afastar">-</button>
+        <button class="controle" id="mais" type="button" aria-label="Aproximar">+</button>
+        <button class="controle" id="menos" type="button" aria-label="Afastar">-</button>
     </div>
     <div class="osm">OSM</div>
 </div>
@@ -212,6 +216,9 @@ const dados = ${serializarParaScript(dados)};
 const mapa = document.getElementById("mapa");
 const tiles = document.getElementById("tiles");
 const marcadores = document.getElementById("marcadores");
+const controles = document.querySelector(".controles");
+const botaoMais = document.getElementById("mais");
+const botaoMenos = document.getElementById("menos");
 const tileSize = 256;
 let centro = { lat: dados.centro.latitude, lng: dados.centro.longitude };
 let zoom = dados.zoom;
@@ -294,7 +301,25 @@ function renderizar() {
     }
 }
 
+function pararEventoControle(evento) {
+    evento.stopPropagation();
+}
+
+function alterarZoom(delta, evento) {
+    pararEventoControle(evento);
+    zoom = limitar(zoom + delta, 3, 19);
+    renderizar();
+}
+
+controles.addEventListener("pointerdown", pararEventoControle);
+controles.addEventListener("pointermove", pararEventoControle);
+controles.addEventListener("pointerup", pararEventoControle);
+controles.addEventListener("click", (evento) => {
+    evento.stopPropagation();
+});
+
 mapa.addEventListener("pointerdown", (evento) => {
+    if (evento.target.closest(".controles")) return;
     arrastando = true;
     mapa.classList.add("arrastando");
     inicio = { x: evento.clientX, y: evento.clientY };
@@ -322,15 +347,9 @@ mapa.addEventListener("wheel", (evento) => {
     renderizar();
 }, { passive: false });
 
-document.getElementById("mais").addEventListener("click", () => {
-    zoom = limitar(zoom + 1, 3, 19);
-    renderizar();
-});
+botaoMais.addEventListener("click", (evento) => alterarZoom(1, evento));
 
-document.getElementById("menos").addEventListener("click", () => {
-    zoom = limitar(zoom - 1, 3, 19);
-    renderizar();
-});
+botaoMenos.addEventListener("click", (evento) => alterarZoom(-1, evento));
 
 window.addEventListener("resize", renderizar);
 renderizar();

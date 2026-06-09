@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -61,6 +61,285 @@ function obterCentroMapa(alertas: any[], localizacao: CentroMapa | null) {
     };
 }
 
+function serializarParaScript(valor: unknown) {
+    return JSON.stringify(valor).replace(/<\//g, "<\\/");
+}
+
+function zoomPorMargem(margem: number) {
+    if (margem <= 0.012) return 15;
+    if (margem <= 0.025) return 14;
+    return 12;
+}
+
+function montarMapaHtml(alertas: any[], centroMapa: CentroMapa) {
+    const dados = {
+        centro: {
+            latitude: centroMapa.latitude,
+            longitude: centroMapa.longitude
+        },
+        zoom: zoomPorMargem(centroMapa.margem),
+        alertas: alertas.map((alerta) => ({
+            id: String(alerta.id),
+            tipo: formatarTipo(alerta.tipo),
+            descricao: String(alerta.descricao || ""),
+            latitude: Number(alerta.latitude),
+            longitude: Number(alerta.longitude),
+            cor: corDoAlerta(alerta.tipo)
+        }))
+    };
+
+    return `
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+html, body, #mapa {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: #dbeafe;
+    font-family: Arial, sans-serif;
+}
+#mapa {
+    position: relative;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+}
+#mapa.arrastando {
+    cursor: grabbing;
+}
+#tiles, #marcadores {
+    position: absolute;
+    inset: 0;
+}
+.tile {
+    position: absolute;
+    width: 256px;
+    height: 256px;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+.centro {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    left: 50%;
+    top: 50%;
+    margin-left: -9px;
+    margin-top: -9px;
+    background: #2563eb;
+    border: 4px solid white;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.25);
+}
+.marcador {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    margin-left: -15px;
+    margin-top: -15px;
+    border-radius: 999px;
+    color: white;
+    border: 2px solid white;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.28);
+}
+.marcador:hover::after {
+    content: attr(data-label);
+    position: absolute;
+    left: 36px;
+    top: -4px;
+    width: max-content;
+    max-width: 240px;
+    background: white;
+    color: #0f172a;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+}
+.controles {
+    position: absolute;
+    right: 12px;
+    top: 12px;
+    display: grid;
+    gap: 8px;
+}
+.controle {
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 8px;
+    background: white;
+    color: #0f172a;
+    font-size: 24px;
+    font-weight: 800;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
+    cursor: pointer;
+}
+.osm {
+    position: absolute;
+    right: 10px;
+    bottom: 8px;
+    background: rgba(255, 255, 255, 0.86);
+    color: #475569;
+    border-radius: 6px;
+    padding: 3px 6px;
+    font-size: 10px;
+}
+</style>
+</head>
+<body>
+<div id="mapa">
+    <div id="tiles"></div>
+    <div id="marcadores"></div>
+    <div class="centro" title="Centro do mapa"></div>
+    <div class="controles">
+        <button class="controle" id="mais" aria-label="Aproximar">+</button>
+        <button class="controle" id="menos" aria-label="Afastar">-</button>
+    </div>
+    <div class="osm">OSM</div>
+</div>
+<script>
+const dados = ${serializarParaScript(dados)};
+const mapa = document.getElementById("mapa");
+const tiles = document.getElementById("tiles");
+const marcadores = document.getElementById("marcadores");
+const tileSize = 256;
+let centro = { lat: dados.centro.latitude, lng: dados.centro.longitude };
+let zoom = dados.zoom;
+let arrastando = false;
+let inicio = null;
+let centroInicial = null;
+
+function limitar(valor, min, max) {
+    return Math.min(Math.max(valor, min), max);
+}
+
+function mundoPorLatLng(lat, lng, z) {
+    const escala = tileSize * Math.pow(2, z);
+    const seno = Math.sin((lat * Math.PI) / 180);
+    return {
+        x: ((lng + 180) / 360) * escala,
+        y: (0.5 - Math.log((1 + seno) / (1 - seno)) / (4 * Math.PI)) * escala
+    };
+}
+
+function latLngPorMundo(x, y, z) {
+    const escala = tileSize * Math.pow(2, z);
+    const lng = (x / escala) * 360 - 180;
+    const n = Math.PI - (2 * Math.PI * y) / escala;
+    const lat = (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+    return { lat, lng };
+}
+
+function normalizarTileX(x, z) {
+    const total = Math.pow(2, z);
+    return ((x % total) + total) % total;
+}
+
+function renderizar() {
+    const largura = mapa.clientWidth;
+    const altura = mapa.clientHeight;
+    const centroMundo = mundoPorLatLng(centro.lat, centro.lng, zoom);
+    const esquerda = centroMundo.x - largura / 2;
+    const topo = centroMundo.y - altura / 2;
+    const primeiroX = Math.floor(esquerda / tileSize);
+    const ultimoX = Math.floor((esquerda + largura) / tileSize);
+    const primeiroY = Math.floor(topo / tileSize);
+    const ultimoY = Math.floor((topo + altura) / tileSize);
+    const limiteY = Math.pow(2, zoom) - 1;
+
+    tiles.innerHTML = "";
+    for (let x = primeiroX; x <= ultimoX; x += 1) {
+        for (let y = primeiroY; y <= ultimoY; y += 1) {
+            if (y < 0 || y > limiteY) continue;
+            const tile = document.createElement("img");
+            const tileX = normalizarTileX(x, zoom);
+            const host = ["a", "b", "c"][Math.abs(tileX + y) % 3];
+            tile.className = "tile";
+            tile.draggable = false;
+            tile.src = "https://" + host + ".tile.openstreetmap.org/" + zoom + "/" + tileX + "/" + y + ".png";
+            tile.style.left = (x * tileSize - esquerda) + "px";
+            tile.style.top = (y * tileSize - topo) + "px";
+            tiles.appendChild(tile);
+        }
+    }
+
+    marcadores.innerHTML = "";
+    for (const alerta of dados.alertas) {
+        const ponto = mundoPorLatLng(alerta.latitude, alerta.longitude, zoom);
+        const x = ponto.x - esquerda;
+        const y = ponto.y - topo;
+
+        if (x < -40 || y < -40 || x > largura + 40 || y > altura + 40) {
+            continue;
+        }
+
+        const marcador = document.createElement("div");
+        marcador.className = "marcador";
+        marcador.style.left = x + "px";
+        marcador.style.top = y + "px";
+        marcador.style.background = alerta.cor;
+        marcador.textContent = "!";
+        marcador.dataset.label = alerta.tipo + " - " + alerta.descricao;
+        marcadores.appendChild(marcador);
+    }
+}
+
+mapa.addEventListener("pointerdown", (evento) => {
+    arrastando = true;
+    mapa.classList.add("arrastando");
+    inicio = { x: evento.clientX, y: evento.clientY };
+    centroInicial = mundoPorLatLng(centro.lat, centro.lng, zoom);
+    mapa.setPointerCapture(evento.pointerId);
+});
+
+mapa.addEventListener("pointermove", (evento) => {
+    if (!arrastando || !inicio || !centroInicial) return;
+    const dx = evento.clientX - inicio.x;
+    const dy = evento.clientY - inicio.y;
+    centro = latLngPorMundo(centroInicial.x - dx, centroInicial.y - dy, zoom);
+    renderizar();
+});
+
+mapa.addEventListener("pointerup", (evento) => {
+    arrastando = false;
+    mapa.classList.remove("arrastando");
+    mapa.releasePointerCapture(evento.pointerId);
+});
+
+mapa.addEventListener("wheel", (evento) => {
+    evento.preventDefault();
+    zoom = limitar(zoom + (evento.deltaY < 0 ? 1 : -1), 3, 19);
+    renderizar();
+}, { passive: false });
+
+document.getElementById("mais").addEventListener("click", () => {
+    zoom = limitar(zoom + 1, 3, 19);
+    renderizar();
+});
+
+document.getElementById("menos").addEventListener("click", () => {
+    zoom = limitar(zoom - 1, 3, 19);
+    renderizar();
+});
+
+window.addEventListener("resize", renderizar);
+renderizar();
+</script>
+</body>
+</html>
+`;
+}
+
 export default function MapaRoute() {
     const [alertas, setAlertas] = useState<any[]>([]);
     const [carregando, setCarregando] = useState(true);
@@ -74,11 +353,58 @@ export default function MapaRoute() {
         () => alertas.filter(coordenadaValida),
         [alertas]
     );
+    const mapaHtml = useMemo(
+        () => montarMapaHtml(alertasVisiveis, centroMapa),
+        [alertasVisiveis, centroMapa]
+    );
 
     useEffect(() => {
         carregarAlertas();
         carregarLocalizacaoRede();
+        const intervalo = setInterval(carregarAlertas, 30000);
+        const watchId = iniciarMonitoramentoLocalizacao();
+
+        return () => {
+            clearInterval(intervalo);
+
+            if (
+                watchId !== null &&
+                typeof navigator !== "undefined" &&
+                "geolocation" in navigator
+            ) {
+                navigator.geolocation.clearWatch(watchId);
+            }
+        };
     }, []);
+
+    function atualizarLocalizacao(posicao: any) {
+        setLocalizacaoRede({
+            latitude: posicao.coords.latitude,
+            longitude: posicao.coords.longitude,
+            margem: 0.012,
+            origem: "Localização atual",
+            precisao: posicao.coords.accuracy
+        });
+    }
+
+    function iniciarMonitoramentoLocalizacao() {
+        if (
+            typeof navigator === "undefined" ||
+            !("geolocation" in navigator)
+        ) {
+            return null;
+        }
+
+        return navigator.geolocation.watchPosition(
+            atualizarLocalizacao,
+            () => undefined,
+            {
+                enableHighAccuracy: true,
+                maximumAge: 30000,
+                timeout: 12000
+            }
+        );
+    }
 
     function carregarLocalizacaoRede() {
         if (
@@ -89,15 +415,7 @@ export default function MapaRoute() {
         }
 
         navigator.geolocation.getCurrentPosition(
-            (posicao) => {
-                setLocalizacaoRede({
-                    latitude: posicao.coords.latitude,
-                    longitude: posicao.coords.longitude,
-                    margem: 0.012,
-                    origem: "Localização atual",
-                    precisao: posicao.coords.accuracy
-                });
-            },
+            atualizarLocalizacao,
             () => {
                 setLocalizacaoRede(null);
             },
@@ -176,47 +494,15 @@ export default function MapaRoute() {
 
             <View style={styles.conteudo}>
                 <View style={styles.mapaContainer}>
-                    <View style={styles.mapaBase}>
-                        <View style={[styles.linhaMapa, styles.linhaHorizontalUm]} />
-                        <View style={[styles.linhaMapa, styles.linhaHorizontalDois]} />
-                        <View style={[styles.linhaMapa, styles.linhaVerticalUm]} />
-                        <View style={[styles.linhaMapa, styles.linhaVerticalDois]} />
-                        <View style={styles.anelMapaGrande} />
-                        <View style={styles.anelMapaPequeno} />
-
-                        {alertasVisiveis.map((alerta) => {
-                            const posicao = calcularPosicaoMarcador(
-                                alerta,
-                                centroMapa
-                            );
-
-                            return (
-                                <TouchableOpacity
-                                    key={String(alerta.id)}
-                                    style={[
-                                        styles.marcadorAlerta,
-                                        {
-                                            left: `${posicao.left}%`,
-                                            top: `${posicao.top}%`,
-                                            backgroundColor: corDoAlerta(alerta.tipo)
-                                        }
-                                    ]}
-                                    onPress={() =>
-                                        router.push({
-                                            pathname: "/detalhe-alerta",
-                                            params: alerta
-                                        } as any)
-                                    }
-                                >
-                                    <Text style={styles.textoMarcador}>!</Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-
-                        <View style={styles.marcadorCentro}>
-                            <View style={styles.pontoCentro} />
-                        </View>
-                    </View>
+                    {React.createElement("iframe", {
+                        title: "Mapa Guardiões Urbanos",
+                        srcDoc: mapaHtml,
+                        style: {
+                            border: 0,
+                            width: "100%",
+                            height: "100%"
+                        }
+                    })}
 
                     <View style={styles.resumoMapa}>
                         <Text style={styles.resumoTitulo}>

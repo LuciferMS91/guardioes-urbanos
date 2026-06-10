@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, Image } from "react-native";
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -22,7 +22,12 @@ export default function SplashScreen() {
 
     return (
         <View style={styles.container}>
-            <Text style={styles.logo}>Guardiões Urbanos</Text>
+            <Image
+                source={require("../../assets/images/logo-transparente.png")}
+                style={styles.logo}
+                resizeMode="contain"
+                accessibilityLabel="Guardiões Urbanos"
+            />
             <Text style={styles.subtitulo}>Segurança colaborativa</Text>
             <ActivityIndicator size="large" color="#2563eb" />
         </View>
@@ -38,10 +43,9 @@ const styles = StyleSheet.create({
         padding: 24
     },
     logo: {
-        fontSize: 30,
-        fontWeight: "bold",
-        color: "#0f172a",
-        marginBottom: 8
+        width: 220,
+        height: 220,
+        marginBottom: 12
     },
     subtitulo: {
         fontSize: 16,
